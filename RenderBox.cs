@@ -15,41 +15,44 @@ namespace AdvancedUIControls
     public delegate void RenderHandler(RenderBox control, Graphics graphics);
     public partial class RenderBox : UserControl
     {
+        public int CanvasWidth { get { return pictureBox.Width; } }
+        public int CanvasHeight { get { return pictureBox.Height; } }
+
         #region GridCellSize
-        private readonly int gridCellWidth;
+        readonly int gridCellWidth;
         public int GridCellWidth { get { return gridCellWidth; } }
 
-        private readonly int gridCellHeight;
+        readonly int gridCellHeight;
         public int GridCellHeight { get { return gridCellHeight; } }
         #endregion
 
         #region Pens
-        public Pen GridPen { set; get; }
-        public Pen GridHoverPen { set; get; }
+        public Pen GridPen { set; get; } = new Pen(Color.Black, 1.0f);
+        public Pen GridHoverPen { set; get; } = new Pen(Color.Red, 1.0f);
         #endregion
 
         #region Zoom
-        public float MinZoom { get; set; }
-        public float MaxZoom { get; set; }
-        public float DeltaZoom { get; set; }
-        private float zoom = 1.0f;
+        public float MinZoom { get; set; } = .5f;
+        public float MaxZoom { get; set; } = 1f;
+        public float DeltaZoom { get; set; } = .25f;
+        float zoom = 1.0f;
         public float Zoom { get { return zoom; } }
-        public readonly ZoomHandler OnZoomChanged;
+        public event ZoomHandler OnZoomChanged;
         #endregion
 
         #region Translation
-        private bool translationAllowed = true;
+        bool translationAllowed = true;
         public bool TranslationAllowed { get { return translationAllowed; } }
-        private bool isTranslating;
-        private Point translatingStartPoint = Point.Empty;
+        bool isTranslating;
+        Point translationStartPoint = Point.Empty;
 
-        public readonly TranslationHandler OnTranslationStarted;
-        public readonly TranslationHandler OnTranslationStopped;
+        public event TranslationHandler OnTranslationStarted;
+        public event TranslationHandler OnTranslationStopped;
         #endregion
 
-        private Point renderOffset = Point.Empty;
-        private Point mousePosition = Point.Empty;
-        public readonly RenderHandler OnRender;
+        Point renderOffset = Point.Empty;
+        Point mousePosition = Point.Empty;
+        public event RenderHandler OnRender;
 
         public RenderBox(int gridCellWidth = 32, int gridCellHeight = 32)
         {
@@ -58,18 +61,8 @@ namespace AdvancedUIControls
             this.gridCellWidth = gridCellWidth;
             this.gridCellHeight = gridCellHeight;
 
-            GridPen = new Pen(Color.Black, 2.0f);
-            GridHoverPen = new Pen(Color.Red, 2.0f)
-            {
-                DashStyle = System.Drawing.Drawing2D.DashStyle.Dash
-            };
+            MouseWheel += handleZoom;
 
-            MinZoom = 0.5f;
-            MaxZoom = 1.0f;
-            DeltaZoom = 0.25f;
-            this.MouseWheel += handleZoom;
-
-            setSnapPositionStatus(Point.Empty);
             setZoomStatus(zoom);
         }
 
@@ -80,54 +73,54 @@ namespace AdvancedUIControls
 
             translationAllowed = !translationAllowed;
         }
-        private void startTranslation()
+        void startTranslation()
         {
             if (!translationAllowed || isTranslating)
                 return;
 
             isTranslating = true;
-            translatingStartPoint = ToRelativePoint(mousePosition);
+            translationStartPoint = ToRelativePoint(mousePosition);
 
             OnTranslationStarted?.Invoke(this);
         }
-        private void stopTranslation()
+        void stopTranslation()
         {
             isTranslating = false;
-            translatingStartPoint = Point.Empty;
+            translationStartPoint = Point.Empty;
 
             Cursor = Cursors.Default;
 
             OnTranslationStopped?.Invoke(this);
         }
 
-        private void setSnapPositionStatus(Point snappedMousePosition)
+        void setSnapPositionStatus(Point snappedMousePosition)
         {
             snapPositionStatus.Text = $"X: {snappedMousePosition.X} Y: {snappedMousePosition.Y}";
         }
-        private void setZoomStatus(float zoom)
+        void setZoomStatus(float zoom)
         {
             zoomStatus.Text = $"Z: {(int)(zoom * 100)}%";
         }
-        private void pictureBox_MouseDown(object sender, MouseEventArgs e)
+        void pictureBox_MouseDown(object sender, MouseEventArgs e)
         {
             if (e.Button != MouseButtons.Middle)
                 return;
             startTranslation();
         }
-        private void pictureBox_MouseUp(object sender, MouseEventArgs e)
+        void pictureBox_MouseUp(object sender, MouseEventArgs e)
         {
             if (e.Button != MouseButtons.Middle)
                 return;
             stopTranslation();
         }
-        private void pictureBox_MouseMove(object sender, MouseEventArgs e)
+        void pictureBox_MouseMove(object sender, MouseEventArgs e)
         {
             mousePosition = new Point((int)(e.X / zoom), (int)(e.Y / zoom));
             if (isTranslating)
-                renderOffset = new Point(mousePosition.X - translatingStartPoint.X, mousePosition.Y - translatingStartPoint.Y);
+                renderOffset = new Point(mousePosition.X - translationStartPoint.X, mousePosition.Y - translationStartPoint.Y);
             pictureBox.Invalidate();
         }
-        private void handleZoom(object sender, MouseEventArgs e)
+        void handleZoom(object sender, MouseEventArgs e)
         {
             if (e.Delta > 0 && zoom < MaxZoom)
                 zoom += DeltaZoom;
@@ -139,20 +132,20 @@ namespace AdvancedUIControls
 
             OnZoomChanged?.Invoke(this, zoom);
         }
-        private void RenderBox_KeyDown(object sender, KeyEventArgs e)
+        void RenderBox_KeyDown(object sender, KeyEventArgs e)
         {
             if (e.KeyCode == Keys.F1)
                 ToggleTranslation();
         }
-        private void pictureBox_SizeChanged(object sender, EventArgs e)
+        void pictureBox_SizeChanged(object sender, EventArgs e)
         {
             pictureBox.Invalidate();
         }
 
-        private void drawGrid(Graphics graphics)
+        void drawGrid(Graphics graphics)
         {
-            var width = pictureBox.Width;
-            var height = pictureBox.Height;
+            var width = CanvasWidth;
+            var height = CanvasHeight;
 
             for (int x = 0; x < ((width / zoom) / GridCellWidth) + 1; x++)
                 graphics.DrawLine(GridPen,
@@ -163,7 +156,7 @@ namespace AdvancedUIControls
                     0, y * GridCellHeight + (renderOffset.Y % GridCellHeight),
                     width / zoom, y * GridCellHeight + (renderOffset.Y % GridCellHeight));
         }
-        private void drawSelectionBox(Graphics graphics)
+        void drawSelectionBox(Graphics graphics)
         {
             var grid = GetSnappedPoint(mousePosition);
 
@@ -171,10 +164,10 @@ namespace AdvancedUIControls
             graphics.DrawRectangle(GridHoverPen, grid.X, grid.Y, GridCellWidth, GridCellHeight);
 
             //Debug lines
-            graphics.DrawLine(GridHoverPen, mousePosition, grid);
-            graphics.DrawLine(GridHoverPen, mousePosition, renderOffset);
+            //graphics.DrawLine(GridHoverPen, mousePosition, grid);
+            //graphics.DrawLine(GridHoverPen, mousePosition, renderOffset);
         }
-        private void pictureBox_Paint(object sender, PaintEventArgs e)
+        void pictureBox_Paint(object sender, PaintEventArgs e)
         {
             //e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.;
             //e.Graphics.CompositingQuality = System.Drawing.Drawing2D.CompositingQuality.HighQuality;
@@ -182,11 +175,20 @@ namespace AdvancedUIControls
 
             e.Graphics.ScaleTransform(zoom, zoom);
 
+            OnRender?.Invoke(this, e.Graphics);
             drawGrid(e.Graphics);
             drawSelectionBox(e.Graphics);
-            OnRender?.Invoke(this, e.Graphics);
 
             e.Graphics.TranslateTransform(renderOffset.X, renderOffset.Y);
+        }
+
+        public void GoTo(Point point)
+        {
+            point.X = -point.X;
+            point.Y = -point.Y;
+
+            renderOffset = point;
+            pictureBox.Invalidate();
         }
 
         public Point ToRelativePoint(Point point)
@@ -224,6 +226,12 @@ namespace AdvancedUIControls
         public Point GetSnappedMouse(SnapMode snapMode = SnapMode.Normal)
         {
             return GetSnappedPoint(mousePosition, snapMode);
+        }
+
+        public void CenterToCell(int x, int y)
+        {
+            var newLocation = new Point(x - (CanvasWidth / 2) + (GridCellWidth / 2), y - (CanvasHeight / 2) + (GridCellHeight / 2));
+            GoTo(newLocation);
         }
     }
 }
