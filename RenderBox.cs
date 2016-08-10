@@ -230,7 +230,10 @@ namespace AdvancedUIControls
 
         public void CenterToCell(int x, int y)
         {
-            var newLocation = new Point(x - (CanvasWidth / 2) + (GridCellWidth / 2), y - (CanvasHeight / 2) + (GridCellHeight / 2));
+            var newLocation = new Point(
+                (x * GridCellWidth) - (CanvasWidth / 2) + (GridCellWidth / 2),
+                (y * GridCellHeight) - (CanvasHeight / 2) + (GridCellHeight / 2)
+                );
             GoTo(newLocation);
         }
     }
