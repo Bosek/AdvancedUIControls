@@ -10,6 +10,7 @@ namespace AdvancedUIControls
         Half = 1
     }
 
+    public delegate void MouseHandler(MouseEventArgs mouse);
     public delegate void TranslationHandler(RenderBox control);
     public delegate void ZoomHandler(RenderBox control, float zoom);
     public delegate void RenderHandler(RenderBox control, Graphics graphics);
@@ -53,6 +54,8 @@ namespace AdvancedUIControls
         Point renderOffset = Point.Empty;
         Point mousePosition = Point.Empty;
         public event RenderHandler OnRender;
+        new public event MouseHandler OnMouseDown;
+        new public event MouseHandler OnMouseUp;
 
         public RenderBox(int gridCellWidth = 32, int gridCellHeight = 32)
         {
@@ -79,7 +82,7 @@ namespace AdvancedUIControls
                 return;
 
             isTranslating = true;
-            translationStartPoint = ToRelativePoint(mousePosition);
+            translationStartPoint = ToAbsolutePoint(mousePosition);
 
             OnTranslationStarted?.Invoke(this);
         }
@@ -103,12 +106,14 @@ namespace AdvancedUIControls
         }
         void pictureBox_MouseDown(object sender, MouseEventArgs e)
         {
+            OnMouseDown?.Invoke(e);
             if (e.Button != MouseButtons.Middle)
                 return;
             startTranslation();
         }
         void pictureBox_MouseUp(object sender, MouseEventArgs e)
         {
+            OnMouseUp?.Invoke(e);
             if (e.Button != MouseButtons.Middle)
                 return;
             stopTranslation();
@@ -160,12 +165,8 @@ namespace AdvancedUIControls
         {
             var grid = GetSnappedPoint(mousePosition);
 
-            setSnapPositionStatus(ToRelativePoint(grid));
+            setSnapPositionStatus(ToAbsolutePoint(grid));
             graphics.DrawRectangle(GridHoverPen, grid.X, grid.Y, GridCellWidth, GridCellHeight);
-
-            //Debug lines
-            //graphics.DrawLine(GridHoverPen, mousePosition, grid);
-            //graphics.DrawLine(GridHoverPen, mousePosition, renderOffset);
         }
         void pictureBox_Paint(object sender, PaintEventArgs e)
         {
@@ -191,41 +192,42 @@ namespace AdvancedUIControls
             pictureBox.Invalidate();
         }
 
-        public Point ToRelativePoint(Point point)
+        public Point ToAbsolutePoint(Point point)
         {
             return new Point(point.X - renderOffset.X, point.Y - renderOffset.Y);
         }
-        public Point ToAbsolutePoint(Point point)
+        public Point ToRelativePoint(Point point)
         {
             return new Point(point.X + renderOffset.X, point.Y + renderOffset.Y);
         }
         public Point GetSnappedPoint(Point point, SnapMode snapMode = SnapMode.Normal)
         {
-            var relativePoint = ToRelativePoint(point);
-            var relativeX = relativePoint.X;
-            var relativeY = relativePoint.Y;
+            var absolutePoint = ToAbsolutePoint(point);
+            var absoluteX = absolutePoint.X;
+            var absoluteY = absolutePoint.Y;
 
             var closestGridX = 0;
             var closestGridY = 0;
             switch (snapMode)
             {
                 case SnapMode.Normal:
-                    closestGridX = relativeX - (relativeX % GridCellWidth) - (relativeX < 0 ? GridCellWidth : 0);
-                    closestGridY = relativeY - (relativeY % GridCellHeight) - (relativeY < 0 ? GridCellHeight : 0);
+                    closestGridX = absoluteX - (absoluteX % GridCellWidth) - (absoluteX < 0 ? GridCellWidth : 0);
+                    closestGridY = absoluteY - (absoluteY % GridCellHeight) - (absoluteY < 0 ? GridCellHeight : 0);
                     break;
                 case SnapMode.Half:
                     var halfCellWidth = GridCellWidth / 2;
                     var halfCellHeight = GridCellHeight / 2;
-                    closestGridX = relativeX - (relativeX % halfCellWidth) - (relativeX < 0 ? halfCellWidth : 0);
-                    closestGridY = relativeY - (relativeY % halfCellHeight) - (relativeY < 0 ? halfCellHeight : 0);
+                    closestGridX = absoluteX - (absoluteX % halfCellWidth) - (absoluteX < 0 ? halfCellWidth : 0);
+                    closestGridY = absoluteY - (absoluteY % halfCellHeight) - (absoluteY < 0 ? halfCellHeight : 0);
                     break;
             }
-            return ToAbsolutePoint(new Point(closestGridX, closestGridY));
+            return ToRelativePoint(new Point(closestGridX, closestGridY));
         }
 
         public Point GetSnappedMouse(SnapMode snapMode = SnapMode.Normal)
         {
-            return GetSnappedPoint(mousePosition, snapMode);
+            var snapped = ToAbsolutePoint(GetSnappedPoint(mousePosition, snapMode));
+            return new Point(snapped.X / GridCellWidth, snapped.Y / GridCellHeight);
         }
 
         public void CenterToCell(int x, int y)
