@@ -165,7 +165,7 @@ namespace AdvancedUIControls
         {
             var grid = GetSnappedPoint(mousePosition);
 
-            setSnapPositionStatus(ToAbsolutePoint(grid));
+            setSnapPositionStatus(GetSnappedMouse());
             graphics.DrawRectangle(GridHoverPen, grid.X, grid.Y, GridCellWidth, GridCellHeight);
         }
         void pictureBox_Paint(object sender, PaintEventArgs e)
